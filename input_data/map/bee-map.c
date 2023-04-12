@@ -1,3 +1,16 @@
+#include "bee-map.h"
+#include <cstring>
+
+void new_hornetsoft_map(map_type *map, int size_x, int size_y)
+{
+	int i;
+	map->prob = (float **)calloc(size_x, sizeof(float *));
+	for(i = 0; i < size_x; i++)
+	{
+		map->prob[i] = (float *)calloc(size_y, sizeof(float));
+	}
+}
+
 int read_beesoft_map(char *mapName, map_type *map)
 {
   int x, y, count;
@@ -66,5 +79,12 @@ int read_beesoft_map(char *mapName, map_type *map)
   fprintf(stderr, "\r# Reading ... (%.2f%%)\n\n",
 	  count / (float)(map->size_x * map->size_y) * 100);
   fclose(fp);
+  return 0;
+}
+
+int main(){
+  map_type* map = new map_type();
+  char* mapPath = "wean.dat";
+  read_beesoft_map(mapPath, map);
   return 0;
 }

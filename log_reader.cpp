@@ -97,9 +97,9 @@ class Logtool {
 };
 
 int main(){
-    Logtool l;
-    l.addLogFilePath("./input_data/log/robotdata1.log");
-    //l.addGroungTruthMapPath("");
-    l.replayLog();
+    Logtool logtool;
+    logtool.addLogFilePath("./input_data/log/robotdata1.log");
+    //logtool.addGroungTruthMapPath("");
+    logtool.replayLog();
     return 0;
 }
