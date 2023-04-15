@@ -98,7 +98,7 @@ class Logtool {
 
 int main(){
     Logtool logtool;
-    logtool.addLogFilePath("./input_data/log/robotdata1.log");
+    logtool.addLogFilePath("../logs/robotdata1.log");
     //logtool.addGroungTruthMapPath("");
     logtool.replayLog();
     return 0;

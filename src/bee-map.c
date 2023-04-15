@@ -84,7 +84,7 @@ int read_beesoft_map(char *mapName, map_type *map)
 
 int main(){
   map_type* map = new map_type();
-  char* mapPath = "wean.dat";
+  char* mapPath = "../ground_truth_map/wean.dat";
   read_beesoft_map(mapPath, map);
   return 0;
 }
