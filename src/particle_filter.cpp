@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <opencv2/core/core.hpp>
 
 class groundTruthMap {
     int resolution, size_x, size_y;
