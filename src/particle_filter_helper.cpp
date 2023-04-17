@@ -2,7 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <opencv2/core/core.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
 
 groundTruthMap::groundTruthMap(std::string path){
     std::ifstream infile(path);
@@ -70,6 +71,17 @@ groundTruthMap::~groundTruthMap(){
     delete[] prob;
 }
 void groundTruthMap::plot(){
+	cv::Mat image_map = cv::Mat::zeros(size_x, size_y, CV_32FC1);
+	for(int i = 0; i < image_map.rows; i++) {
+		for(int j = 0; j < image_map.cols; j++) {
+			if(prob[i][j] >= 0.0)
+				image_map.at<float>(i,j) = 1 - prob[i][j];
+		}
+	}
+
+	cv::namedWindow("Ground Truth Map",cv::WINDOW_AUTOSIZE);
+	cv::imshow("Ground Truth Map",image_map);
+	cv::waitKey(0);
 }
 
 odometryObservation::odometryObservation(std::string data){

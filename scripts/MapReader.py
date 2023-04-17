@@ -16,13 +16,17 @@ class MapReader:
         self._size_x = self._occupancy_map.shape[0] * self._resolution
         self._size_y = self._occupancy_map.shape[1] * self._resolution
 
-        print 'Finished reading 2D map of size : ' + '(' + str(self._size_x) + ',' + str(self._size_y) + ')'
+        print ('Finished reading 2D map of size : ' + '(' + str(self._size_x) + ',' + str(self._size_y) + ')')
 
     def visualize_map(self):
         fig = plt.figure()
         # plt.switch_backend('TkAgg')
-        mng = plt.get_current_fig_manager(); mng.resize(*mng.window.maxsize())
-        plt.ion(); plt.imshow(self._occupancy_map, cmap='Greys'); plt.axis([0, 800, 0, 800]); plt.draw()
+        mng = plt.get_current_fig_manager()
+        #mng.resize(*mng.window.maxsize())
+        plt.ion()
+        plt.imshow(self._occupancy_map, cmap='Greys')
+        plt.axis([0, 800, 0, 800])
+        plt.draw()
         plt.pause(0)
 
     def get_map(self):
@@ -36,6 +40,6 @@ class MapReader:
 
 if __name__=="__main__":
     
-    src_path_map = '../data/map/wean.dat'
+    src_path_map = '../ground_truth_map/wean.dat'
     map1 = MapReader(src_path_map)
     map1.visualize_map()
