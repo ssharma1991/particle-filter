@@ -5,7 +5,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
-groundTruthMap::groundTruthMap(std::string path){
+GroundTruthMap::GroundTruthMap(std::string path){
     std::ifstream infile(path);
     if (infile.is_open()) {
         //parse the hyper parameters
@@ -64,13 +64,13 @@ groundTruthMap::groundTruthMap(std::string path){
         std::cout << "WARNING: Failed to open specified Ground Truth Map" << std::endl;
     }
 }
-groundTruthMap::~groundTruthMap(){
+GroundTruthMap::~GroundTruthMap(){
     for (int i = 0; i < size_x; i++){
         delete[] prob[i];
     }
     delete[] prob;
 }
-void groundTruthMap::plot(){
+void GroundTruthMap::plot(){
 	cv::Mat image_map = cv::Mat::zeros(size_x, size_y, CV_32FC1);
 	for(int i = 0; i < image_map.rows; i++) {
 		for(int j = 0; j < image_map.cols; j++) {
@@ -84,27 +84,27 @@ void groundTruthMap::plot(){
 	cv::waitKey(0);
 }
 
-odometryObservation::odometryObservation(std::string data){
+OdometryParser::OdometryParser(const std::string& data){
     std::stringstream ss(data);
     ss >> x >> y >> theta >> timestamp;
 }
-void odometryObservation::print(){
+void OdometryParser::print() const{
     std::cout << "ODOMETRY: timestamp=" << timestamp << ", x=" << x << ", y=" << y << ", theta=" << theta << std::endl;
 }
 
-lidarObservation::lidarObservation(std::string data){
+ScanParser::ScanParser(const std::string& data){
     std::stringstream ss(data);
     ss >> x >> y >> theta;
-    ss >> xl >> yl >> thetal; 
+    ss >> xl >> yl >> theta_l;
     for (int i = 0; i<180; i++){
         ss >> r[i];
     }
     ss >> timestamp;
 }
-void lidarObservation::print(){
+void ScanParser::print(){
     std::cout << "LIDAR:\t timestamp=" << timestamp << std::endl;
     std::cout << "\t x=" << x << ", y=" << y << ", theta=" << theta << std::endl;
-    std::cout << "\t xl=" << xl << ", yl=" << yl << ", thetal=" << thetal << std::endl;
+    std::cout << "\t xl=" << xl << ", yl=" << yl << ", theta_l=" << theta_l << std::endl;
     std::cout << "\t raw point cloud =";
     for (auto data : r){
         std::cout << " " << data;

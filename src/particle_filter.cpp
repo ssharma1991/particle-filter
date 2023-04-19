@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <utility>
 
 class Logtool {
     std::string logFilePath, groundTruthMapPath;
@@ -12,10 +13,10 @@ class Logtool {
         groundTruthMapPath = "";    
     }
     void addLogFilePath(std::string path){
-        logFilePath = path;
+        logFilePath = std::move(path);
     }
-    void addGroungTruthMapPath(std::string path){
-        groundTruthMapPath = path;
+    void addGroundTruthMapPath(std::string path){
+        groundTruthMapPath = std::move(path);
     }
     void replayLog(){
         // check paths were specified
@@ -29,7 +30,7 @@ class Logtool {
         }
 
         // load ground truth map
-        groundTruthMap map(groundTruthMapPath);
+        GroundTruthMap map(groundTruthMapPath);
         map.plot();
 
         // start replaying the specified log
@@ -40,12 +41,12 @@ class Logtool {
                 std::string observation_data = line.substr(2);
 
                 if (observation_type == 'O'){
-                    odometryObservation odom_obs(observation_data);
+                    OdometryParser odom_obs(observation_data);
                     //odom_obs.print();
                     //particleFilter.addOdometry(odom_obs);
                 }
                 else if (observation_type == 'L'){
-                    lidarObservation lidar_obs(observation_data);
+                    ScanParser lidar_obs(observation_data);
                     //lidar_obs.print();
                     //particleFilter.addMeasurement(lidar_obs);
                 }
@@ -59,7 +60,7 @@ class Logtool {
 int main(){
     Logtool logtool;
     logtool.addLogFilePath("../logs/robotdata1.log");
-    logtool.addGroungTruthMapPath("../ground_truth_map/wean.dat");
+    logtool.addGroundTruthMapPath("../ground_truth_map/wean.dat");
     logtool.replayLog();
     return 0;
 }
