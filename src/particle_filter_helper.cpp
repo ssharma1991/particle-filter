@@ -5,22 +5,22 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 
-GroundTruthMap::GroundTruthMap(std::string path){
+GroundTruthMap::GroundTruthMap(const std::string& path) {
     std::ifstream infile(path);
     if (infile.is_open()) {
         //parse the hyper parameters
         std::string line;
-        while (std::getline(infile, line) && (line.compare(0, 13, "global_map[0]") != 0)){
+        while (std::getline(infile, line) && (line.compare(0, 13, "global_map[0]") != 0)) {
             std::stringstream ss(line);
             std::string param;
             int value;
             ss >> param >> value;
 
-            if (param == "robot_specifications->resolution"){
+            if (param == "robot_specifications->resolution") {
                 resolution = value;
-            } else if (param == "robot_specifications->autoshifted_x"){
+            } else if (param == "robot_specifications->autoshifted_x") {
                 offset_x = value;
-            } else if (param == "robot_specifications->autoshifted_y"){
+            } else if (param == "robot_specifications->autoshifted_y") {
                 offset_y = value;
             }
         }
@@ -30,8 +30,8 @@ GroundTruthMap::GroundTruthMap(std::string path){
         }
 
         //construct and initialize the occupancy grid
-        prob = new float*[size_x];
-        for (int i = 0; i < size_x; i++){
+        prob = new float *[size_x];
+        for (int i = 0; i < size_x; i++) {
             prob[i] = new float[size_y];
         }
         observed_min_x = size_x;
@@ -39,75 +39,98 @@ GroundTruthMap::GroundTruthMap(std::string path){
         observed_min_y = size_y;
         observed_max_y = 0;
 
-        for(int x = 0; std::getline(infile, line) && x < size_x; x++){
+        for (int x = 0; std::getline(infile, line) && x < size_x; x++) {
             std::stringstream ss(line);
-            for(int y = 0; y < size_y; y++) {
+            for (int y = 0; y < size_y; y++) {
                 float val;
                 ss >> val;
-                if (val >= 0){
+                if (val >= 0) {
                     prob[x][y] = 1 - val;
-                    if (x < observed_min_x){
+                    if (x < observed_min_x) {
                         observed_min_x = x;
-                    } else if (x > observed_max_x){
+                    } else if (x > observed_max_x) {
                         observed_max_x = x;
                     }
-                    if (y < observed_min_y){
+                    if (y < observed_min_y) {
                         observed_min_y = y;
-                    } else if (y > observed_max_y){
+                    } else if (y > observed_max_y) {
                         observed_max_y = y;
                     }
                 }
             }
         }
-    }
-    else {
+        map_image_ = cv::Mat::zeros(size_x, size_y, CV_32F);
+    } else {
         std::cout << "WARNING: Failed to open specified Ground Truth Map" << std::endl;
     }
 }
-GroundTruthMap::~GroundTruthMap(){
-    for (int i = 0; i < size_x; i++){
+
+GroundTruthMap::~GroundTruthMap() {
+    for (int i = 0; i < size_x; i++) {
         delete[] prob[i];
     }
     delete[] prob;
 }
-void GroundTruthMap::plot(){
-	cv::Mat image_map = cv::Mat::zeros(size_x, size_y, CV_32FC1);
-	for(int i = 0; i < image_map.rows; i++) {
-		for(int j = 0; j < image_map.cols; j++) {
-			if(prob[i][j] >= 0.0)
-				image_map.at<float>(i,j) = 1 - prob[i][j];
-		}
-	}
 
-	cv::namedWindow("Ground Truth Map",cv::WINDOW_AUTOSIZE);
-	cv::imshow("Ground Truth Map",image_map);
-	cv::waitKey(0);
+void GroundTruthMap::make_cv_map() {
+    for (int i = 0; i < map_image_.rows; i++) {
+        for (int j = 0; j < map_image_.cols; j++) {
+            if (prob[i][j] >= 0.0) {
+                map_image_.at<float>(i, j) = 1 - prob[i][j];
+            }
+        }
+    }
 }
 
-OdometryParser::OdometryParser(const std::string& data){
+void GroundTruthMap::display_cv_map() {
+    cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
+    cv::imshow("Ground Truth Map", map_image_);
+    cv::waitKey(0);
+}
+
+void GroundTruthMap::cast_rays(std::vector<double> &rays, double x, double y, double theta) {
+    int i, j;
+    double phi;
+    for (size_t k = 0; k < rays.size(); k++) {
+        phi = k * M_PI/ 180;
+        i = (rays[k] * std::cos(phi + theta)) + x;
+        j = (rays[k] * std::sin(phi + theta)) + y;
+        map_image_.at<float>(i, j) = 10;
+    }
+}
+
+OdometryParser::OdometryParser(const std::string &data) {
     std::stringstream ss(data);
     ss >> x >> y >> theta >> timestamp;
 }
-void OdometryParser::print() const{
+
+void OdometryParser::print() const {
     std::cout << "ODOMETRY: timestamp=" << timestamp << ", x=" << x << ", y=" << y << ", theta=" << theta << std::endl;
 }
 
-ScanParser::ScanParser(const std::string& data){
+ScanParser::ScanParser(const std::string &data) {
     std::stringstream ss(data);
     ss >> x >> y >> theta;
     ss >> xl >> yl >> theta_l;
-    for (int i = 0; i<180; i++){
+    for (int i = 0; i < 180; i++) {
         ss >> r[i];
     }
     ss >> timestamp;
 }
-void ScanParser::print(){
+
+void ScanParser::print() {
     std::cout << "LIDAR:\t timestamp=" << timestamp << std::endl;
     std::cout << "\t x=" << x << ", y=" << y << ", theta=" << theta << std::endl;
     std::cout << "\t xl=" << xl << ", yl=" << yl << ", theta_l=" << theta_l << std::endl;
-    std::cout << "\t raw point cloud =";
-    for (auto data : r){
+    std::cout << "\t raw point cloud length= " << r.size() << "\n";
+    std::cout << "\t raw point cloud entries=";
+    for (auto data: r) {
         std::cout << " " << data;
     }
     std::cout << std::endl;
+    testTransform();
+}
+
+void ScanParser::testTransform() {
+    std::cout << "\t Eucledian distance =" << std::sqrt(std::pow((x - xl), 2) + std::pow((y - yl), 2)) << "\n";
 }

@@ -31,7 +31,7 @@ class Logtool {
 
         // load ground truth map
         GroundTruthMap map(groundTruthMapPath);
-        map.plot();
+        map.make_cv_map();
 
         // start replaying the specified log
         std::ifstream infile(logFilePath);
@@ -47,6 +47,9 @@ class Logtool {
                 }
                 else if (observation_type == 'L'){
                     ScanParser lidar_obs(observation_data);
+                    lidar_obs.print();
+                    map.cast_rays(lidar_obs.r, lidar_obs.xl, lidar_obs.yl, lidar_obs.theta);
+                    map.display_cv_map();
                     //lidar_obs.print();
                     //particleFilter.addMeasurement(lidar_obs);
                 }

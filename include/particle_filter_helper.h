@@ -3,10 +3,13 @@
 
 #include <string>
 #include <vector>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
 
 class GroundTruthMap {
     int resolution, size_x, size_y;
     float offset_x, offset_y;
+    cv::Mat map_image_;
     int observed_min_x, observed_max_x, observed_min_y, observed_max_y; //specify useful part of occupancy grid
     float **prob;
     //  -1  = don't know
@@ -15,11 +18,15 @@ class GroundTruthMap {
     //      0   = unoccupied with probability 1
     //      0.5 = occupied with probability 0.5
 public:
-    explicit GroundTruthMap(std::string path);
+    explicit GroundTruthMap(const std::string &path);
 
     ~GroundTruthMap();
 
-    void plot();
+    void make_cv_map();
+
+    void display_cv_map();
+
+    void cast_rays(std::vector<double> &rays, double x, double y, double theta);
 };
 
 class OdometryParser {
@@ -32,6 +39,7 @@ public:
 };
 
 class ScanParser {
+public:
     // The laser on the robot is approximately 25 cm offset forward from the true center of the robot.
     double x{}, y{}, theta{}; // Coordinates of the robot in standard odometry frame when laser reading was taken
     // (interpolated) (cm, cm, rad)
@@ -40,11 +48,13 @@ class ScanParser {
     std::vector<double> r = std::vector<double>(180); // r1 .. r180 - 180 range readings of laser in cm.
     // The 180 readings span 180 degrees *STARTING FROM THE RIGHT AND GOING LEFT*  Just like angles, the laser
     // readings are in counterclockwise order.
-    double timestamp{};
-public:
+    double timestamp{}; // Timestamp of the laser scan
+
     explicit ScanParser(const std::string &data);
 
     void print();
+
+    void testTransform();
 };
 
 #endif // PARTICLE_FILTER_HELPER_HPP_

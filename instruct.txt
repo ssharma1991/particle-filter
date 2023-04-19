@@ -29,7 +29,7 @@ Entry Type #2 (laser)
 
 L x y theta xl yl thetal r1 ... r180 ts
 
-x y theta - coodinates of the robot in standard odometry frame when
+x y theta - coordinates of the robot in standard odometry frame when
 laser reading was taken (interpolated)
 xl yl thetal - coordinates of the *laser* in standard odometry frame
 when the laser reading was taken (interpolated)
