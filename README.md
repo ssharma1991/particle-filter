@@ -4,8 +4,8 @@
 This project is a C++ implementation of particle filter for a mobile robot operating with a range sensor and odometry readings in an indoor hallway. The ground truth map is available in the file named `wean.dat` and the odometry readings along with laser scan observations are available in different log files found under `logs` subdirectory. The goal of this project is to implement a Monte Carlo Localization model for helping the lost robot find its way.
 
 ## Authors
-Arun Kumar
-Shashank Sharma
+- Arun Kumar
+- Shashank Sharma
 
 ## Dependencies
 * Python3
