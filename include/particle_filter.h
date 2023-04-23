@@ -31,7 +31,7 @@ public:
 
 class Logtool {
 private:
-  std::string ground_truth_map_path, log_file_path;
+  std::string ground_truth_map_path_, log_file_path_;
 
 public:
   Logtool(std::string map_path, std::string log_path);

@@ -82,12 +82,12 @@ void ParticleFilter::plot() {
 }
 
 Logtool::Logtool(std::string map_path, std::string log_path) {
-  ground_truth_map_path = map_path;
-  log_file_path = log_path;
+  ground_truth_map_path_ = map_path;
+  log_file_path_ = log_path;
 }
 void Logtool::replayLog() {
   // load map
-  GroundTruthMap map(ground_truth_map_path);
+  GroundTruthMap map(ground_truth_map_path_);
   // map.plot();
 
   // create particle filter object
@@ -95,7 +95,7 @@ void Logtool::replayLog() {
   particle_filter.plot();
 
   // start replaying the specified log
-  std::ifstream infile(log_file_path);
+  std::ifstream infile(log_file_path_);
   if (infile.is_open()) {
     for (std::string line; std::getline(infile, line);) {
       char observation_type = line[0];

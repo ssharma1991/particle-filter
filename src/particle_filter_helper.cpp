@@ -5,7 +5,7 @@
 #include <opencv2/imgproc.hpp>
 #include <sstream>
 
-GroundTruthMap::GroundTruthMap() { prob = nullptr; }
+GroundTruthMap::GroundTruthMap() { prob_ = nullptr; }
 GroundTruthMap::GroundTruthMap(std::string path) {
   std::ifstream infile(path);
   if (infile.is_open()) {
@@ -19,47 +19,47 @@ GroundTruthMap::GroundTruthMap(std::string path) {
       ss >> param >> value;
 
       if (param == "robot_specifications->resolution") {
-        resolution = value;
+        resolution_ = value;
       } else if (param == "robot_specifications->autoshifted_x") {
-        offset_x = value;
+        offset_x_ = value;
       } else if (param == "robot_specifications->autoshifted_y") {
-        offset_y = value;
+        offset_y_ = value;
       }
     }
     {
       std::stringstream ss(line.substr(15));
-      ss >> size_y >> size_x;
+      ss >> size_y_ >> size_x_;
     }
 
     // construct and initialize the occupancy grid
-    prob = new float *[size_y]; // first index is row, aka y coordinate
-    for (int i = 0; i < size_y; i++) {
-      prob[i] = new float[size_x];
+    prob_ = new float *[size_y_]; // first index is row, aka y coordinate
+    for (int x = 0; x < size_x_; x++) {
+      prob_[x] = new float[size_x_];
     }
-    observed_min_x = size_x;
-    observed_max_x = 0;
-    observed_min_y = size_y;
-    observed_max_y = 0;
+    observed_min_x_ = size_x_;
+    observed_max_x_ = 0;
+    observed_min_y_ = size_y_;
+    observed_max_y_ = 0;
 
-    for (int y = 0; std::getline(infile, line) && y < size_y; y++) {
+    for (int y = 0; std::getline(infile, line) && y < size_y_; y++) {
       std::stringstream ss(line);
-      for (int x = 0; x < size_x; x++) {
+      for (int x = 0; x < size_x_; x++) {
         float val;
         ss >> val;
         if (val >= 0) {
-          prob[y][x] = 1 - val;
-          if (y < observed_min_y) {
-            observed_min_y = y;
-          } else if (y > observed_max_y) {
-            observed_max_y = y;
+          prob_[y][x] = 1 - val;
+          if (y < observed_min_y_) {
+            observed_min_y_ = y;
+          } else if (y > observed_max_y_) {
+            observed_max_y_ = y;
           }
-          if (x < observed_min_x) {
-            observed_min_x = x;
-          } else if (x > observed_max_x) {
-            observed_max_x = x;
+          if (x < observed_min_x_) {
+            observed_min_x_ = x;
+          } else if (x > observed_max_x_) {
+            observed_max_x_ = x;
           }
         } else {
-          prob[y][x] = val;
+          prob_[y][x] = val;
         }
       }
     }
@@ -70,13 +70,14 @@ GroundTruthMap::GroundTruthMap(std::string path) {
 }
 GroundTruthMap::~GroundTruthMap() {
   std::cout << "Destroying map object" << std::endl;
-  if (not prob) {
+  if (not prob_) {
     return;
   }
-  for (int i = 0; i < size_x; i++) {
-    delete[] prob[i];
+
+  for (int y = 0; y < size_y_; y++) {
+    delete[] prob_[y];
   }
-  delete[] prob;
+  delete[] prob_;
 }
 void GroundTruthMap::plot() {
   cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
@@ -85,11 +86,11 @@ void GroundTruthMap::plot() {
 }
 cv::Mat GroundTruthMap::getImage() {
   cv::Scalar color_blue(255, 0, 0);
-  cv::Mat image(size_x, size_y, CV_8UC3, color_blue);
+  cv::Mat image(size_x_, size_y_, CV_8UC3, color_blue);
   for (int y = 0; y < image.rows; y++) {
     for (int x = 0; x < image.cols; x++) {
-      if (prob[y][x] >= 0.0) {
-        int value = 255 * (1 - prob[y][x]);
+      if (prob_[y][x] >= 0.0) {
+        int value = 255 * (1 - prob_[y][x]);
         image.at<cv::Vec3b>(y, x) = cv::Vec3b(value, value, value);
       }
     }
@@ -99,29 +100,30 @@ cv::Mat GroundTruthMap::getImage() {
 
 OdometryParser::OdometryParser(std::string data) {
   std::stringstream ss(data);
-  ss >> x >> y >> theta >> timestamp;
+  ss >> x_ >> y_ >> theta_ >> timestamp_;
 }
 void OdometryParser::print() {
-  std::cout << "ODOMETRY: timestamp=" << timestamp << ", x=" << x << ", y=" << y
-            << ", theta=" << theta << std::endl;
+  std::cout << "ODOMETRY: timestamp=" << timestamp_ << ", x=" << x_
+            << ", y=" << y_ << ", theta=" << theta_ << std::endl;
 }
 
 ScanParser::ScanParser(std::string data) {
   std::stringstream ss(data);
-  ss >> x >> y >> theta;
-  ss >> xl >> yl >> thetal;
+  ss >> x_ >> y_ >> theta_;
+  ss >> xl_ >> yl_ >> thetal_;
   for (int i = 0; i < 180; i++) {
-    ss >> r[i];
+    ss >> r_[i];
   }
-  ss >> timestamp;
+  ss >> timestamp_;
 }
 void ScanParser::print() {
-  std::cout << "LIDAR:\t timestamp=" << timestamp << std::endl;
-  std::cout << "\t x=" << x << ", y=" << y << ", theta=" << theta << std::endl;
-  std::cout << "\t xl=" << xl << ", yl=" << yl << ", thetal=" << thetal
+  std::cout << "LIDAR:\t timestamp=" << timestamp_ << std::endl;
+  std::cout << "\t x=" << x_ << ", y=" << y_ << ", theta=" << theta_
+            << std::endl;
+  std::cout << "\t xl=" << xl_ << ", yl=" << yl_ << ", thetal=" << thetal_
             << std::endl;
   std::cout << "\t raw point cloud =";
-  for (auto data : r) {
+  for (auto data : r_) {
     std::cout << " " << data;
   }
   std::cout << std::endl;
