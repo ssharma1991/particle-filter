@@ -5,27 +5,28 @@
 #include <string>
 
 class Particle {
-private:
-  double x = 0, y = 0, theta = 0, weight = 0;
+public:
+  double x_, y_, theta_, weight_;
 
 public:
-  Particle() = default;
-  ~Particle() = default;
-  void freeSpaceInitialize(const GroundTruthMap &map);
+  Particle(double x, double y, double theta, double weight);
   void motionModel(const OdometryParser odom);
   void observationModel(const GroundTruthMap &map, const ScanParser obs);
+  void print();
 };
 
 class ParticleFilter {
 private:
-  int num_particles;
-  std::vector<Particle> particle_cloud;
-  // GroundTruthMap map;
+  int num_particles_;
+  std::vector<Particle> particle_cloud_;
+  GroundTruthMap map_;
+
 public:
-  ParticleFilter(int num_particles);
+  ParticleFilter(int num_particles, GroundTruthMap &map);
   void addOdometry(OdometryParser odom_obs);
   void addMeasurement(ScanParser lidar_obs);
   void resample();
+  void plot();
 };
 
 class Logtool {

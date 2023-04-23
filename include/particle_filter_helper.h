@@ -1,6 +1,7 @@
 #ifndef PARTICLE_FILTER_HELPER_HPP_
 #define PARTICLE_FILTER_HELPER_HPP_
 
+#include <opencv2/core.hpp>
 #include <string>
 #include <vector>
 
@@ -17,9 +18,11 @@ private:
   //      0   = unoccupied with probability 1
   //      0.5 = occupied with probability 0.5
 public:
+  GroundTruthMap();
   GroundTruthMap(std::string path);
   ~GroundTruthMap();
   void plot();
+  cv::Mat getImage();
 };
 
 class OdometryParser {

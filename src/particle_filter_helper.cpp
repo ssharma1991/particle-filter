@@ -1,10 +1,11 @@
 #include "particle_filter_helper.h"
 #include <fstream>
 #include <iostream>
-#include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #include <sstream>
 
+GroundTruthMap::GroundTruthMap() { prob = nullptr; }
 GroundTruthMap::GroundTruthMap(std::string path) {
   std::ifstream infile(path);
   if (infile.is_open()) {
@@ -31,32 +32,34 @@ GroundTruthMap::GroundTruthMap(std::string path) {
     }
 
     // construct and initialize the occupancy grid
-    prob = new float *[size_x];
-    for (int i = 0; i < size_x; i++) {
-      prob[i] = new float[size_y];
+    prob = new float *[size_y]; // first index is row, aka y coordinate
+    for (int i = 0; i < size_y; i++) {
+      prob[i] = new float[size_x];
     }
     observed_min_x = size_x;
     observed_max_x = 0;
     observed_min_y = size_y;
     observed_max_y = 0;
 
-    for (int x = 0; std::getline(infile, line) && x < size_x; x++) {
+    for (int y = 0; std::getline(infile, line) && y < size_y; y++) {
       std::stringstream ss(line);
-      for (int y = 0; y < size_y; y++) {
+      for (int x = 0; x < size_x; x++) {
         float val;
         ss >> val;
         if (val >= 0) {
-          prob[x][y] = 1 - val;
-          if (x < observed_min_x) {
-            observed_min_x = x;
-          } else if (x > observed_max_x) {
-            observed_max_x = x;
-          }
+          prob[y][x] = 1 - val;
           if (y < observed_min_y) {
             observed_min_y = y;
           } else if (y > observed_max_y) {
             observed_max_y = y;
           }
+          if (x < observed_min_x) {
+            observed_min_x = x;
+          } else if (x > observed_max_x) {
+            observed_max_x = x;
+          }
+        } else {
+          prob[y][x] = val;
         }
       }
     }
@@ -66,23 +69,32 @@ GroundTruthMap::GroundTruthMap(std::string path) {
   }
 }
 GroundTruthMap::~GroundTruthMap() {
+  std::cout << "Destroying map object" << std::endl;
+  if (not prob) {
+    return;
+  }
   for (int i = 0; i < size_x; i++) {
     delete[] prob[i];
   }
   delete[] prob;
 }
 void GroundTruthMap::plot() {
-  cv::Mat image_map = cv::Mat::zeros(size_x, size_y, CV_32FC1);
-  for (int i = 0; i < image_map.rows; i++) {
-    for (int j = 0; j < image_map.cols; j++) {
-      if (prob[i][j] >= 0.0)
-        image_map.at<float>(i, j) = 1 - prob[i][j];
+  cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
+  cv::imshow("Ground Truth Map", getImage());
+  cv::waitKey(0);
+}
+cv::Mat GroundTruthMap::getImage() {
+  cv::Scalar color_blue(255, 0, 0);
+  cv::Mat image(size_x, size_y, CV_8UC3, color_blue);
+  for (int y = 0; y < image.rows; y++) {
+    for (int x = 0; x < image.cols; x++) {
+      if (prob[y][x] >= 0.0) {
+        int value = 255 * (1 - prob[y][x]);
+        image.at<cv::Vec3b>(y, x) = cv::Vec3b(value, value, value);
+      }
     }
   }
-
-  cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
-  cv::imshow("Ground Truth Map", image_map);
-  cv::waitKey(0);
+  return image;
 }
 
 OdometryParser::OdometryParser(std::string data) {
