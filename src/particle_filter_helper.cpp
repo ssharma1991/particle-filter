@@ -33,8 +33,8 @@ GroundTruthMap::GroundTruthMap(std::string path) {
 
     // construct and initialize the occupancy grid
     prob_ = new float *[size_y_]; // first index is row, aka y coordinate
-    for (int x = 0; x < size_x_; x++) {
-      prob_[x] = new float[size_x_];
+    for (int y = 0; y < size_y_; y++) {
+      prob_[y] = new float[size_x_];
     }
     observed_min_x_ = size_x_;
     observed_max_x_ = 0;
@@ -68,8 +68,25 @@ GroundTruthMap::GroundTruthMap(std::string path) {
               << std::endl;
   }
 }
+GroundTruthMap::GroundTruthMap(const GroundTruthMap &map) {
+  resolution_ = map.resolution_;
+  size_x_ = map.size_x_;
+  size_y_ = map.size_y_;
+  offset_x_ = map.offset_x_;
+  offset_y_ = map.offset_y_;
+  observed_min_x_ = map.observed_min_x_;
+  observed_max_x_ = map.observed_max_x_;
+  observed_min_y_ = map.observed_min_y_;
+  observed_max_y_ = map.observed_max_y_;
+  prob_ = new float *[size_y_]; // first index is row, aka y coordinate
+  for (int y = 0; y < size_y_; y++) {
+    prob_[y] = new float[size_x_];
+    for (int x = 0; x < size_x_; x++) {
+      prob_[y][x] = map.prob_[y][x];
+    }
+  }
+}
 GroundTruthMap::~GroundTruthMap() {
-  std::cout << "Destroying map object" << std::endl;
   if (not prob_) {
     return;
   }

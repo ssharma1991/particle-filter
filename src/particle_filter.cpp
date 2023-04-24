@@ -30,10 +30,8 @@ void Particle::print() {
             << std::endl;
 }
 
-ParticleFilter::ParticleFilter(int num, GroundTruthMap &map) {
-  num_particles_ = num;
-  map_ = map;
-
+ParticleFilter::ParticleFilter(int num, GroundTruthMap &map)
+    : num_particles_{num}, map_{map} {
   // initialize a randon point cloud
   // TODO: optimize by using free space only
   std::random_device rd;

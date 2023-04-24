@@ -20,6 +20,7 @@ private:
 public:
   GroundTruthMap();
   GroundTruthMap(std::string path);
+  GroundTruthMap(const GroundTruthMap &map);
   ~GroundTruthMap();
   void plot();
   cv::Mat getImage();
