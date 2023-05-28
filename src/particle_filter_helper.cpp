@@ -5,7 +5,6 @@
 #include <opencv2/imgproc.hpp>
 #include <sstream>
 
-GroundTruthMap::GroundTruthMap() { prob_ = nullptr; }
 GroundTruthMap::GroundTruthMap(std::string path) {
   std::ifstream infile(path);
   if (infile.is_open()) {

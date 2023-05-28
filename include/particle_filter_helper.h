@@ -6,7 +6,7 @@
 #include <vector>
 
 class GroundTruthMap {
-private:
+public:
   int resolution_, size_x_, size_y_;
   float offset_x_, offset_y_;
   int observed_min_x_, observed_max_x_, observed_min_y_,
@@ -18,7 +18,6 @@ private:
   //      0   = unoccupied with probability 1
   //      0.5 = occupied with probability 0.5
 public:
-  GroundTruthMap();
   GroundTruthMap(std::string path);
   GroundTruthMap(const GroundTruthMap &map);
   ~GroundTruthMap();
@@ -27,7 +26,7 @@ public:
 };
 
 class OdometryParser {
-private:
+public:
   double x_, y_, theta_; // coordinates of the robot in standard odometry frame
                          // (cm, cm, rad)
   double timestamp_; // timestamp of odometry reading (0 at start of run) (sec)
@@ -37,7 +36,7 @@ public:
 };
 
 class ScanParser {
-private:
+public:
   // The laser on the robot is approximately 25 cm offset forward from the true
   // center of the robot.
   double x_, y_,

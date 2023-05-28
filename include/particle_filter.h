@@ -12,7 +12,11 @@ public:
   Particle(double x, double y, double theta, double weight);
   void motionModel(const OdometryParser odom);
   void observationModel(const GroundTruthMap &map, const ScanParser obs);
+  float castSingleRay(float theta, const GroundTruthMap &map);
   void print();
+
+private:
+  std::vector<float> predictScan(const GroundTruthMap &map);
 };
 
 class ParticleFilter {
