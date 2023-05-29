@@ -10,9 +10,12 @@ public:
 
 public:
   Particle(double x, double y, double theta, double weight);
-  void motionModel(const OdometryParser odom);
+  void motionModel(const OdometryParser odom_previous,
+                   const OdometryParser odom_current);
   void observationModel(const GroundTruthMap &map, const ScanParser obs);
   float castSingleRay(float theta, const GroundTruthMap &map);
+  float sample(float mean, float variance);
+  float prob(float x, float mean, float variance);
   void print();
 
 private:
@@ -24,6 +27,8 @@ private:
   int num_particles_;
   std::vector<Particle> particle_cloud_;
   GroundTruthMap map_;
+  OdometryParser last_odom_obs_ = OdometryParser("");
+  bool odom_initialized = false;
 
 public:
   ParticleFilter(int num_particles, GroundTruthMap &map);
