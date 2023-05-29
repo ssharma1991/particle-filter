@@ -2,7 +2,6 @@
 #define PARTICLE_FILTER_HPP_
 
 #include "particle_filter_helper.h"
-#include <string>
 
 class Particle {
 public:
@@ -10,6 +9,7 @@ public:
 
 public:
   Particle(double x, double y, double theta, double weight);
+  Particle(GroundTruthMap &map);
   void motionModel(const OdometryParser odom_previous,
                    const OdometryParser odom_current);
   void observationModel(const GroundTruthMap &map, const ScanParser obs);
@@ -36,15 +36,6 @@ public:
   void addMeasurement(ScanParser lidar_obs);
   void resample();
   void plot();
-};
-
-class Logtool {
-private:
-  std::string ground_truth_map_path_, log_file_path_;
-
-public:
-  Logtool(std::string map_path, std::string log_path);
-  void replayLog();
 };
 
 #endif // PARTICLE_FILTER_HPP_

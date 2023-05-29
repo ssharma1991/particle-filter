@@ -18,47 +18,47 @@ GroundTruthMap::GroundTruthMap(std::string path) {
       ss >> param >> value;
 
       if (param == "robot_specifications->resolution") {
-        resolution_ = value;
+        resolution = value;
       } else if (param == "robot_specifications->autoshifted_x") {
-        offset_x_ = value;
+        offset_x = value;
       } else if (param == "robot_specifications->autoshifted_y") {
-        offset_y_ = value;
+        offset_y = value;
       }
     }
     {
       std::stringstream ss(line.substr(15));
-      ss >> size_y_ >> size_x_;
+      ss >> size_y >> size_x;
     }
 
     // construct and initialize the occupancy grid
-    prob_ = new float *[size_y_]; // first index is row, aka y coordinate
-    for (int y = 0; y < size_y_; y++) {
-      prob_[y] = new float[size_x_];
+    prob = new float *[size_y]; // first index is row, aka y coordinate
+    for (int y = 0; y < size_y; y++) {
+      prob[y] = new float[size_x];
     }
-    observed_min_x_ = size_x_;
-    observed_max_x_ = 0;
-    observed_min_y_ = size_y_;
-    observed_max_y_ = 0;
+    observed_min_x = size_x;
+    observed_max_x = 0;
+    observed_min_y = size_y;
+    observed_max_y = 0;
 
-    for (int y = 0; std::getline(infile, line) && y < size_y_; y++) {
+    for (int y = 0; std::getline(infile, line) && y < size_y; y++) {
       std::stringstream ss(line);
-      for (int x = 0; x < size_x_; x++) {
+      for (int x = 0; x < size_x; x++) {
         float val;
         ss >> val;
         if (val >= 0) {
-          prob_[y][x] = 1 - val;
-          if (y < observed_min_y_) {
-            observed_min_y_ = y;
-          } else if (y > observed_max_y_) {
-            observed_max_y_ = y;
+          prob[y][x] = 1 - val;
+          if (y < observed_min_y) {
+            observed_min_y = y;
+          } else if (y > observed_max_y) {
+            observed_max_y = y;
           }
-          if (x < observed_min_x_) {
-            observed_min_x_ = x;
-          } else if (x > observed_max_x_) {
-            observed_max_x_ = x;
+          if (x < observed_min_x) {
+            observed_min_x = x;
+          } else if (x > observed_max_x) {
+            observed_max_x = x;
           }
         } else {
-          prob_[y][x] = val;
+          prob[y][x] = val;
         }
       }
     }
@@ -68,32 +68,48 @@ GroundTruthMap::GroundTruthMap(std::string path) {
   }
 }
 GroundTruthMap::GroundTruthMap(const GroundTruthMap &map) {
-  resolution_ = map.resolution_;
-  size_x_ = map.size_x_;
-  size_y_ = map.size_y_;
-  offset_x_ = map.offset_x_;
-  offset_y_ = map.offset_y_;
-  observed_min_x_ = map.observed_min_x_;
-  observed_max_x_ = map.observed_max_x_;
-  observed_min_y_ = map.observed_min_y_;
-  observed_max_y_ = map.observed_max_y_;
-  prob_ = new float *[size_y_]; // first index is row, aka y coordinate
-  for (int y = 0; y < size_y_; y++) {
-    prob_[y] = new float[size_x_];
-    for (int x = 0; x < size_x_; x++) {
-      prob_[y][x] = map.prob_[y][x];
+  resolution = map.resolution;
+  size_x = map.size_x;
+  size_y = map.size_y;
+  offset_x = map.offset_x;
+  offset_y = map.offset_y;
+  observed_min_x = map.observed_min_x;
+  observed_max_x = map.observed_max_x;
+  observed_min_y = map.observed_min_y;
+  observed_max_y = map.observed_max_y;
+  prob = new float *[size_y]; // first index is row, aka y coordinate
+  for (int y = 0; y < size_y; y++) {
+    prob[y] = new float[size_x];
+    for (int x = 0; x < size_x; x++) {
+      prob[y][x] = map.prob[y][x];
     }
   }
 }
+void GroundTruthMap::swap(GroundTruthMap &first, GroundTruthMap &second) {
+  std::swap(first.resolution, second.resolution);
+  std::swap(first.size_x, second.size_x);
+  std::swap(first.size_y, second.size_y);
+  std::swap(first.observed_min_x, second.observed_min_x);
+  std::swap(first.observed_max_x, second.observed_max_x);
+  std::swap(first.observed_min_y, second.observed_min_y);
+  std::swap(first.observed_max_y, second.observed_max_y);
+  std::swap(first.prob, second.prob);
+}
+GroundTruthMap &GroundTruthMap::operator=(GroundTruthMap map) {
+  // Using copy-and-swap-idiom to reduce code duplication
+  // Note parameter taken in by value
+  swap(*this, map);
+  return *this;
+}
 GroundTruthMap::~GroundTruthMap() {
-  if (not prob_) {
+  if (not prob) {
     return;
   }
 
-  for (int y = 0; y < size_y_; y++) {
-    delete[] prob_[y];
+  for (int y = 0; y < size_y; y++) {
+    delete[] prob[y];
   }
-  delete[] prob_;
+  delete[] prob;
 }
 void GroundTruthMap::plot() {
   cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
@@ -102,11 +118,11 @@ void GroundTruthMap::plot() {
 }
 cv::Mat GroundTruthMap::getImage() {
   cv::Scalar color_blue(255, 0, 0);
-  cv::Mat image(size_x_, size_y_, CV_8UC3, color_blue);
+  cv::Mat image(size_x, size_y, CV_8UC3, color_blue);
   for (int y = 0; y < image.rows; y++) {
     for (int x = 0; x < image.cols; x++) {
-      if (prob_[y][x] >= 0.0) {
-        int value = 255 * (1 - prob_[y][x]);
+      if (prob[y][x] >= 0.0) {
+        int value = 255 * (1 - prob[y][x]);
         image.at<cv::Vec3b>(y, x) = cv::Vec3b(value, value, value);
       }
     }

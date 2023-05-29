@@ -1,5 +1,4 @@
 #include "particle_filter.h"
-#include <fstream>
 #include <iostream>
 #include <math.h>
 #include <opencv2/core.hpp>
@@ -8,13 +7,29 @@
 #include <random>
 #include <sstream>
 
-int kNumParticles = 1000;
-
 Particle::Particle(double x, double y, double theta, double weight) {
   x_ = x;
   y_ = y;
   theta_ = theta;
   weight_ = weight;
+}
+Particle::Particle(GroundTruthMap &map) {
+  // initialize particle randomly in free space
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> distx(map.observed_min_x,
+                                         map.observed_max_x);
+  std::uniform_real_distribution<> disty(map.observed_min_y,
+                                         map.observed_max_y);
+  std::uniform_real_distribution<> disttheta(-3.14, 3.14);
+  x_ = 0;
+  y_ = 0;
+  while (map.prob[int(y_)][int(x_)] >= 0.1 or map.prob[int(y_)][int(x_)] < 0) {
+    x_ = double(distx(gen));
+    y_ = double(disty(gen));
+  }
+  theta_ = double(disttheta(gen));
+  weight_ = 0;
 }
 void Particle::motionModel(const OdometryParser odom_previous,
                            const OdometryParser odom_current) {
@@ -138,7 +153,7 @@ float Particle::castSingleRay(float theta, const GroundTruthMap &map) {
   // calculate index of starting cell and check if it's occupied
   int cell_x = static_cast<int>(x_);
   int cell_y = static_cast<int>(y_);
-  if (map.prob_[cell_x][cell_y] > kOccupiedThreshold) {
+  if (map.prob[cell_x][cell_y] > kOccupiedThreshold) {
     return 0;
   }
 
@@ -178,13 +193,13 @@ float Particle::castSingleRay(float theta, const GroundTruthMap &map) {
     }
 
     // ray went out of occupancy grid without hitting an obstacle
-    if (cell_x < map.observed_min_x_ or cell_x > map.observed_max_x_ or
-        cell_y < map.observed_min_y_ or cell_y > map.observed_max_y_) {
+    if (cell_x < map.observed_min_x or cell_x > map.observed_max_x or
+        cell_y < map.observed_min_y or cell_y > map.observed_max_y) {
       break;
     }
 
     // check for obstacle
-    if (map.prob_[cell_x][cell_y] > kOccupiedThreshold) {
+    if (map.prob[cell_x][cell_y] > kOccupiedThreshold) {
       hit_occupied_cell = true;
     }
   }
@@ -219,13 +234,8 @@ void Particle::print() {
 ParticleFilter::ParticleFilter(int num, GroundTruthMap &map)
     : num_particles_{num}, map_{map} {
   // initialize a randon point cloud
-  // TODO: improve initialization by using free space only
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<> dist(0, 800);
   for (int i = 0; i < num_particles_; i++) {
-    particle_cloud_.push_back(Particle(double(dist(gen)), dist(gen), dist(gen),
-                                       1.0 / num_particles_));
+    particle_cloud_.push_back(Particle(map));
   }
 }
 void ParticleFilter::addOdometry(OdometryParser odom_obs) {
@@ -268,40 +278,4 @@ void ParticleFilter::plot() {
   cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
   cv::imshow("Ground Truth Map", image);
   cv::waitKey(0);
-}
-
-Logtool::Logtool(std::string map_path, std::string log_path) {
-  ground_truth_map_path_ = map_path;
-  log_file_path_ = log_path;
-}
-void Logtool::replayLog() {
-  // load map
-  GroundTruthMap map(ground_truth_map_path_);
-  // map.plot();
-
-  // create particle filter object
-  ParticleFilter particle_filter(kNumParticles, map);
-  particle_filter.plot();
-
-  // start replaying the specified log
-  std::ifstream infile(log_file_path_);
-  if (infile.is_open()) {
-    for (std::string line; std::getline(infile, line);) {
-      char observation_type = line[0];
-      std::string observation_data = line.substr(2);
-
-      if (observation_type == 'O') {
-        OdometryParser odom_obs(observation_data);
-        // odom_obs.print();
-        // particle_filter.addOdometry(odom_obs);
-      } else if (observation_type == 'L') {
-        ScanParser lidar_obs(observation_data);
-        // lidar_obs.print();
-        // particle_filter.addMeasurement(lidar_obs);
-      }
-    }
-    std::cout << "DONE REPLAYING LOG" << std::endl;
-  } else {
-    std::cout << "WARNING: Failed to open specified Log" << std::endl;
-  }
 }

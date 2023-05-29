@@ -5,13 +5,14 @@
 #include <string>
 #include <vector>
 
-class GroundTruthMap {
+struct GroundTruthMap {
 public:
-  int resolution_, size_x_, size_y_;
-  float offset_x_, offset_y_;
-  int observed_min_x_, observed_max_x_, observed_min_y_,
-      observed_max_y_; // specify useful part of occupancy grid
-  float **prob_;
+  int size_x, size_y;                 // dimension of occupancy grid
+  int resolution;                     // value a unit cell represents
+  int observed_min_x, observed_max_x; // cache explored area of occupancy grid
+  int observed_min_y, observed_max_y; // cache explored area of occupancy grid
+  float offset_x, offset_y;           // ?? coordinate system offset?
+  float **prob;
   //  -1  = don't know
   //  any value in [0;1] is a probability for occupancy:
   //      1   = occupied with probability 1
@@ -20,12 +21,14 @@ public:
 public:
   GroundTruthMap(std::string path);
   GroundTruthMap(const GroundTruthMap &map);
+  void swap(GroundTruthMap &first, GroundTruthMap &second);
+  GroundTruthMap &operator=(GroundTruthMap map);
   ~GroundTruthMap();
   void plot();
   cv::Mat getImage();
 };
 
-class OdometryParser {
+struct OdometryParser {
 public:
   double x_, y_, theta_; // coordinates of the robot in standard odometry frame
                          // (cm, cm, rad)
@@ -35,7 +38,7 @@ public:
   void print();
 };
 
-class ScanParser {
+struct ScanParser {
 public:
   // The laser on the robot is approximately 25 cm offset forward from the true
   // center of the robot.
