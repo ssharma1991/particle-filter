@@ -254,11 +254,37 @@ void ParticleFilter::addMeasurement(ScanParser lidar_obs) {
     particle_cloud_[i].observationModel(map_, lidar_obs);
   }
 
+  // normalize importance
+  float sum_weight = 0;
+  for (int i = 0; i < num_particles_; i++) {
+    sum_weight += particle_cloud_[i].weight_;
+  }
+  for (int i = 0; i < num_particles_; i++) {
+    particle_cloud_[i].weight_ = particle_cloud_[i].weight_ / sum_weight;
+  }
+
   // Resample based on importance
   resample();
 }
 void ParticleFilter::resample() {
-  // TODO:Algo to resample and create a new pointcloud
+  std::vector<Particle> new_particle_cloud;
+  // low variance resampler
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dist(0, 1.0 / num_particles_);
+  float r = double(dist(gen));
+  float c = particle_cloud_[0].weight_;
+  int i = 0;
+  for (int m = 0; m < num_particles_; m++) {
+    float u = r + (float)m / num_particles_;
+    while (u > c) {
+      i += 1;
+      c += particle_cloud_[i].weight_;
+    }
+    new_particle_cloud.push_back(particle_cloud_[i]);
+    new_particle_cloud[m].weight_ = 1.0 / num_particles_;
+  }
+  particle_cloud_ = new_particle_cloud;
 }
 void ParticleFilter::plot() {
   // get occupancy grid image
