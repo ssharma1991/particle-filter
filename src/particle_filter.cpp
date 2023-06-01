@@ -43,7 +43,8 @@ void Particle::motionModel(const OdometryParser odom_previous,
   float delta_rot_1 = atan2(odom_current.y_ - odom_previous.y_,
                             odom_current.x_ - odom_previous.x_) -
                       odom_previous.theta_;
-  if (delta_rot_1 + odom_previous.theta_ == 0) {
+  if (odom_current.y_ == odom_previous.y_ and
+      odom_current.x_ == odom_previous.x_) {
     // degenerate case- pure rotation, no translation
     delta_rot_1 = 0;
   }
@@ -241,12 +242,13 @@ ParticleFilter::ParticleFilter(int num, GroundTruthMap &map)
 void ParticleFilter::addOdometry(OdometryParser odom_obs) {
   if (not odom_initialized) {
     last_odom_obs_ = odom_obs;
+    odom_initialized = true;
     return;
   }
   for (int i = 0; i < num_particles_; i++) {
     particle_cloud_[i].motionModel(last_odom_obs_, odom_obs);
-    last_odom_obs_ = odom_obs;
   }
+  last_odom_obs_ = odom_obs;
 }
 void ParticleFilter::addMeasurement(ScanParser lidar_obs) {
   // Calculate importance of each particle
@@ -303,5 +305,5 @@ void ParticleFilter::plot() {
 
   cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
   cv::imshow("Ground Truth Map", image);
-  cv::waitKey(0);
+  cv::waitKey(1); // wait 1ms for the plot to show
 }
