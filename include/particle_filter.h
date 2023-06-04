@@ -13,7 +13,9 @@ public:
   void motionModel(const OdometryParser odom_previous,
                    const OdometryParser odom_current);
   void observationModel(const GroundTruthMap &map, const ScanParser obs);
-  float castSingleRay(float theta, const GroundTruthMap &map);
+  float castSingleRay(float x, float y, float theta, const GroundTruthMap &map);
+  void rayPlot(const GroundTruthMap &map, float x, float y, float theta,
+               float length);
   float sample(float mean, float variance);
   float prob(float x, float mean, float variance);
   void print();
@@ -35,7 +37,7 @@ public:
   void addOdometry(OdometryParser odom_obs);
   void addMeasurement(ScanParser lidar_obs);
   void resample();
-  void plot();
+  void plot(int ms = 1);
 };
 
 #endif // PARTICLE_FILTER_HPP_

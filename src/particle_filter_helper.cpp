@@ -46,7 +46,7 @@ GroundTruthMap::GroundTruthMap(std::string path) {
         float val;
         ss >> val;
         if (val >= 0) {
-          prob[y][x] = 1 - val;
+          prob[size_y - 1 - y][x] = 1 - val; // flipped y coordinate
           if (y < observed_min_y) {
             observed_min_y = y;
           } else if (y > observed_max_y) {
@@ -58,7 +58,7 @@ GroundTruthMap::GroundTruthMap(std::string path) {
             observed_max_x = x;
           }
         } else {
-          prob[y][x] = val;
+          prob[size_y - 1 - y][x] = val; // flipped y coordinate
         }
       }
     }
@@ -111,18 +111,30 @@ GroundTruthMap::~GroundTruthMap() {
   }
   delete[] prob;
 }
+float GroundTruthMap::getCoordProb(float coord_x, float coord_y) const {
+  // returns probability at (x cm ,y cm) coordinates
+  int cell_x = static_cast<int>(coord_x / resolution);
+  int cell_y = static_cast<int>(coord_y / resolution);
+  return getCellProb(cell_x, cell_y);
+}
+float GroundTruthMap::getCellProb(int cell_x, int cell_y) const {
+  // where cell_y is row and cell_x is column
+  return prob[cell_y][cell_x];
+}
 void GroundTruthMap::plot() {
   cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
-  cv::imshow("Ground Truth Map", getImage());
+  cv::Mat image = getImage();
+  cv::flip(image, image, 0); // image frame y-axis points in -ve direction
+  cv::imshow("Ground Truth Map", image);
   cv::waitKey(0);
 }
-cv::Mat GroundTruthMap::getImage() {
+cv::Mat GroundTruthMap::getImage() const {
   cv::Scalar color_blue(255, 0, 0);
   cv::Mat image(size_x, size_y, CV_8UC3, color_blue);
   for (int y = 0; y < image.rows; y++) {
     for (int x = 0; x < image.cols; x++) {
       if (prob[y][x] >= 0.0) {
-        int value = 255 * (1 - prob[y][x]);
+        int value = 255 * (1 - prob[y][x]); // black-0, white-255
         image.at<cv::Vec3b>(y, x) = cv::Vec3b(value, value, value);
       }
     }

@@ -24,8 +24,10 @@ public:
   void swap(GroundTruthMap &first, GroundTruthMap &second);
   GroundTruthMap &operator=(GroundTruthMap map);
   ~GroundTruthMap();
+  float getCoordProb(float coord_x, float coord_y) const;
+  float getCellProb(int cell_x, int cell_y) const;
   void plot();
-  cv::Mat getImage();
+  cv::Mat getImage() const;
 };
 
 struct OdometryParser {

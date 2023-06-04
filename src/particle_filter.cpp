@@ -1,4 +1,5 @@
 #include "particle_filter.h"
+#include <Eigen/Dense>
 #include <iostream>
 #include <math.h>
 #include <opencv2/core.hpp>
@@ -6,6 +7,23 @@
 #include <opencv2/imgproc.hpp>
 #include <random>
 #include <sstream>
+
+// Motion Model Constants
+float kAlpha1 = 0.025; // rotation
+float kAlpha2 = 0.025; // rotation
+float kAlpha3 = 0.4;   // translation
+float kAlpha4 = 0.4;   // translation
+
+// Measurement Model Constants
+float kSigmaHit = 30;    // Measurement Noise (cm) (depends to map resolution)
+float kMaxRange = 8183;  // Maximum Scanner Range (cm) (observed in data)
+float kLamdaShort = 0.5; // Define exponential distribution
+float kWeightHit = 0.4;
+float kWeightShort = 0.2;       // probability of dynamic objects is low
+float kWeightMax = 0.2;         // lidar probability of missing objects is low
+float kWeightRand = 0.2;        // sensor is assumed mostly reliable
+float kFreeThreshold = 0.1;     // Probability below which cell is free
+float kOccupiedThreshold = 0.9; // Probability above which cell is occupied
 
 Particle::Particle(double x, double y, double theta, double weight) {
   x_ = x;
@@ -17,14 +35,15 @@ Particle::Particle(GroundTruthMap &map) {
   // initialize particle randomly in free space
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_real_distribution<> distx(map.observed_min_x,
-                                         map.observed_max_x);
-  std::uniform_real_distribution<> disty(map.observed_min_y,
-                                         map.observed_max_y);
+  std::uniform_real_distribution<> distx(map.observed_min_x * map.resolution,
+                                         map.observed_max_x * map.resolution);
+  std::uniform_real_distribution<> disty(map.observed_min_y * map.resolution,
+                                         map.observed_max_y * map.resolution);
   std::uniform_real_distribution<> disttheta(-3.14, 3.14);
   x_ = 0;
   y_ = 0;
-  while (map.prob[int(y_)][int(x_)] >= 0.1 or map.prob[int(y_)][int(x_)] < 0) {
+  while (map.getCoordProb(x_, y_) >= kFreeThreshold or
+         map.getCoordProb(x_, y_) < 0) {
     x_ = double(distx(gen));
     y_ = double(disty(gen));
   }
@@ -53,11 +72,6 @@ void Particle::motionModel(const OdometryParser odom_previous,
   float delta_rot_2 = odom_current.theta_ - odom_previous.theta_ - delta_rot_1;
 
   // Calculate posterior distributions
-  float kAlpha1 = 0.025; // rotation
-  float kAlpha2 = 0.025; // rotation
-  float kAlpha3 = 0.4;   // translation
-  float kAlpha4 = 0.4;   // translation
-
   float variance_rot1 =
       kAlpha1 * pow(delta_rot_1, 2) + kAlpha2 * pow(delta_trans, 2);
   float variance_trans = kAlpha3 * pow(delta_trans, 2) +
@@ -80,23 +94,40 @@ void Particle::observationModel(const GroundTruthMap &map,
                                 const ScanParser obs) {
   // find the weight/importance of particle based on obs using the
   // beam_range_finder_model
-  float kSigmaHit = 2;     // Measurement Noise (cm)
-  float kMaxRange = 8183;  // Maximum Scanner Range (cm)
-  float kLamdaShort = 1.5; // Define exponential distribution
-  float kWeightHit = 0.25;
-  float kWeightShort = 0.25;
-  float kWeightMax = 0.25;
-  float kWeightRand = 0.25;
 
-  float likelihood = 1;
-  // Iterate over each ray
-  for (int i = 0; i < 180; i++) {
+  // Calculate scanner pose in vehicle frame (vcs)
+  Eigen::MatrixXd odom2gcs{{cos(obs.theta_), -sin(obs.theta_), obs.x_},
+                           {sin(obs.theta_), cos(obs.theta_), obs.y_},
+                           {0, 0, 1}};
+  Eigen::MatrixXd gcs2odom = odom2gcs.inverse();
+  Eigen::VectorXd scan_odom_gcs{{obs.xl_, obs.yl_, 1}};
+  Eigen::VectorXd scan_loc_vcs = gcs2odom * scan_odom_gcs;
+  double scan_theta_vcs = obs.thetal_ - obs.theta_;
+
+  // Calculate scanner pose in ground frame (gcs)
+  Eigen::MatrixXd vcs2gcs{{cos(theta_), -sin(theta_), x_},
+                          {sin(theta_), cos(theta_), y_},
+                          {0, 0, 1}};
+  Eigen::VectorXd scan_loc_gcs = vcs2gcs * scan_loc_vcs;
+  double scan_theta_gcs = theta_ + scan_theta_vcs;
+  double scan_x_gcs = scan_loc_gcs(0);
+  double scan_y_gcs = scan_loc_gcs(1);
+
+  // Iterate over every fifth ray and find its likelihood
+  double log_likelihood = 0;
+  for (int i = 0; i < 180; i += 5) {
     // calculate predicted ray length (z_k_star) using raycasting
     // ray thetas are assumed -90 to 90 deg relative to particle pose
-    float theta_deg = theta_ + (i - 90);
-    float theta = theta_deg * (M_PI / 180.0);
-    float predicted_ray_length = castSingleRay(theta, map); // z_k_star
-    float observed_ray_length = obs.r_[i];                  // z_k
+    float theta_deg = scan_theta_gcs * (180.0 / M_PI) + (i * 180.0 / 179) - 90;
+    float ray_theta = theta_deg * (M_PI / 180.0);
+    float predicted_ray_length =
+        castSingleRay(scan_x_gcs, scan_y_gcs, ray_theta, map); // z_k_star
+    if (predicted_ray_length == 0) {
+      // case when particle is on an occupied cell
+      weight_ = 0;
+      return;
+    }
+    float observed_ray_length = obs.r_[i]; // z_k
 
     // calculate p_hit
     float p_hit = 0;
@@ -128,33 +159,31 @@ void Particle::observationModel(const GroundTruthMap &map,
       p_rand = 1 / kMaxRange;
     }
 
-    // calculate the likelihood of observed (z_k) ray length
+    // calculate the log_likelihood of observed (z_k) ray length
     float likelihood_single_ray = kWeightHit * p_hit + kWeightShort * p_short +
                                   kWeightMax * p_max + kWeightRand * p_rand;
-    likelihood *= likelihood_single_ray;
+    log_likelihood += log(likelihood_single_ray);
   }
-  weight_ = likelihood;
+  weight_ = exp(log_likelihood);
 };
 
-float Particle::castSingleRay(float theta, const GroundTruthMap &map) {
+float Particle::castSingleRay(float x, float y, float theta,
+                              const GroundTruthMap &map) {
   // Implements the DDA (Digital Differential Analyzer) Algorithm in the
   // Computer Graphics domain. Google `DDA algorithm grid ray` or `ray grid
   // intersection` for useful and relevant links.
-
-  float kMaxDistance = 3000;      // Lidar max range is 30m
-  float kOccupiedThreshold = 0.5; // Probability above which cell is occupied
 
   // calculate direction cosines
   float dir_x = std::cos(theta);
   float dir_y = std::sin(theta);
   // cache some values to avoid recalculation
-  float ray_travel_per_unit_x = 1 / dir_x;
-  float ray_travel_per_unit_y = 1 / dir_y;
+  float ray_travel_per_unit_x = abs(1 / dir_x) * map.resolution;
+  float ray_travel_per_unit_y = abs(1 / dir_y) * map.resolution;
 
   // calculate index of starting cell and check if it's occupied
-  int cell_x = static_cast<int>(x_);
-  int cell_y = static_cast<int>(y_);
-  if (map.prob[cell_x][cell_y] > kOccupiedThreshold) {
+  int cell_x = static_cast<int>(x / map.resolution);
+  int cell_y = static_cast<int>(y / map.resolution);
+  if (map.getCellProb(cell_x, cell_y) > kOccupiedThreshold) {
     return 0;
   }
 
@@ -163,23 +192,31 @@ float Particle::castSingleRay(float theta, const GroundTruthMap &map) {
   float ray_length_after_step_x, ray_length_after_step_y;
   if (dir_x > 0) {
     step_x = 1;
-    ray_length_after_step_x = static_cast<float>(cell_x + 1) - x_;
+    ray_length_after_step_x =
+        (static_cast<float>(cell_x + 1) - x / map.resolution) *
+        ray_travel_per_unit_x;
   } else {
     step_x = -1;
-    ray_length_after_step_x = x_ - static_cast<float>(cell_x);
+    ray_length_after_step_x =
+        (x / map.resolution - static_cast<float>(cell_x)) *
+        ray_travel_per_unit_x;
   }
   if (dir_y > 0) {
     step_y = 1;
-    ray_length_after_step_y = static_cast<float>(cell_y + 1) - y_;
+    ray_length_after_step_y =
+        (static_cast<float>(cell_y + 1) - y / map.resolution) *
+        ray_travel_per_unit_y;
   } else {
     step_y = -1;
-    ray_length_after_step_y = y_ - static_cast<float>(cell_y);
+    ray_length_after_step_y =
+        (y / map.resolution - static_cast<float>(cell_y)) *
+        ray_travel_per_unit_y;
   }
 
   // raycast untill an occupied cell is found
   bool hit_occupied_cell = false;
   float current_ray_length = 0;
-  while (not hit_occupied_cell and current_ray_length < kMaxDistance) {
+  while (not hit_occupied_cell and current_ray_length < kMaxRange) {
     // Walk one cell
     if (ray_length_after_step_x < ray_length_after_step_y) {
       // move in x-direction
@@ -200,7 +237,7 @@ float Particle::castSingleRay(float theta, const GroundTruthMap &map) {
     }
 
     // check for obstacle
-    if (map.prob[cell_x][cell_y] > kOccupiedThreshold) {
+    if (map.getCellProb(cell_x, cell_y) > kOccupiedThreshold) {
       hit_occupied_cell = true;
     }
   }
@@ -208,7 +245,21 @@ float Particle::castSingleRay(float theta, const GroundTruthMap &map) {
   if (hit_occupied_cell) {
     return current_ray_length;
   }
-  return -1;
+  return kMaxRange;
+}
+void Particle::rayPlot(const GroundTruthMap &map, float x, float y, float theta,
+                       float length) {
+  cv::Mat image = map.getImage();
+  cv::Scalar color_red(0, 0, 255);
+  cv::Point start_point(x / map.resolution, y / map.resolution);
+  cv::Point end_point(start_point.x + length / map.resolution * std::cos(theta),
+                      start_point.y +
+                          length / map.resolution * std::sin(theta));
+  cv::arrowedLine(image, start_point, end_point, color_red);
+  cv::flip(image, image, 0); // image frame y-axis points in -ve direction
+  cv::namedWindow("ray", cv::WINDOW_AUTOSIZE);
+  cv::imshow("ray", image);
+  cv::waitKey(1000); // wait 1ms for the plot to show
 }
 
 float Particle::sample(float mean, float variance) {
@@ -252,15 +303,18 @@ void ParticleFilter::addOdometry(OdometryParser odom_obs) {
 }
 void ParticleFilter::addMeasurement(ScanParser lidar_obs) {
   // Calculate importance of each particle
+  double sum_weight = 0;
   for (int i = 0; i < num_particles_; i++) {
     particle_cloud_[i].observationModel(map_, lidar_obs);
+    sum_weight += particle_cloud_[i].weight_;
+  }
+
+  // if all particles have zero importance, don't resample
+  if (sum_weight == 0) {
+    return;
   }
 
   // normalize importance
-  float sum_weight = 0;
-  for (int i = 0; i < num_particles_; i++) {
-    sum_weight += particle_cloud_[i].weight_;
-  }
   for (int i = 0; i < num_particles_; i++) {
     particle_cloud_[i].weight_ = particle_cloud_[i].weight_ / sum_weight;
   }
@@ -288,7 +342,7 @@ void ParticleFilter::resample() {
   }
   particle_cloud_ = new_particle_cloud;
 }
-void ParticleFilter::plot() {
+void ParticleFilter::plot(int ms /*=1*/) {
   // get occupancy grid image
   cv::Mat image = map_.getImage();
 
@@ -296,14 +350,16 @@ void ParticleFilter::plot() {
   int kArrowLength = 10;
   cv::Scalar color_red(0, 0, 255);
   for (int i = 0; i < num_particles_; i++) {
-    cv::Point start_point(particle_cloud_[i].x_, particle_cloud_[i].y_);
+    cv::Point start_point(particle_cloud_[i].x_ / map_.resolution,
+                          particle_cloud_[i].y_ / map_.resolution);
     cv::Point end_point(
         start_point.x + kArrowLength * std::cos(particle_cloud_[i].theta_),
         start_point.y + kArrowLength * std::sin(particle_cloud_[i].theta_));
     cv::arrowedLine(image, start_point, end_point, color_red);
   }
+  cv::flip(image, image, 0); // image frame y-axis points in -ve direction
 
   cv::namedWindow("Ground Truth Map", cv::WINDOW_AUTOSIZE);
   cv::imshow("Ground Truth Map", image);
-  cv::waitKey(1); // wait 1ms for the plot to show
+  cv::waitKey(ms); // wait 1ms (default) for the plot to show
 }
