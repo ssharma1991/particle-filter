@@ -5,17 +5,19 @@
 
 std::string kMapPath = "../ground_truth_map/wean.dat";
 std::string kLogPath = "../logs/robotdata1.log";
-int kNumParticles = 2000;
+int kInitNumParticles = 10000;
+int kStableNumParticles = 1000;
 
 void replayLog(std::string map_path, std::string log_path) {
   // load map
   GroundTruthMap map(map_path);
 
   // create particle filter object
-  ParticleFilter particle_filter(kNumParticles, map);
+  ParticleFilter particle_filter(kInitNumParticles, map);
   particle_filter.plot(1000);
 
   // start replaying the specified log
+  int num_lidar_obs = 0;
   std::ifstream infile(log_path);
   if (infile.is_open()) {
     for (std::string line; std::getline(infile, line);) {
@@ -29,6 +31,14 @@ void replayLog(std::string map_path, std::string log_path) {
         ScanParser lidar_obs(observation_data);
         // lidar_obs.print();
         particle_filter.addMeasurement(lidar_obs);
+        // Resample based on importance
+        if (num_lidar_obs < 10) {
+          // Use larger number of particles initially
+          particle_filter.resample(kInitNumParticles);
+        } else {
+          particle_filter.resample(kStableNumParticles);
+        }
+        num_lidar_obs++;
       }
       std::cout << "." << std::flush;
       particle_filter.plot();

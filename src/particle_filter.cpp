@@ -9,21 +9,25 @@
 #include <sstream>
 
 // Motion Model Constants
-float kAlpha1 = 0.025; // rotation
-float kAlpha2 = 0.025; // rotation
-float kAlpha3 = 0.4;   // translation
-float kAlpha4 = 0.4;   // translation
+float kAlpha1 = 0.01;
+float kAlpha2 = 0.0001;
+float kAlpha3 = 0.25;
+float kAlpha4 = 0.01;
 
 // Measurement Model Constants
-float kSigmaHit = 30;    // Measurement Noise (cm) (depends to map resolution)
+float kSigmaHit = 20;    // Measurement Noise (cm) (depends to map resolution)
 float kMaxRange = 8183;  // Maximum Scanner Range (cm) (observed in data)
 float kLamdaShort = 0.5; // Define exponential distribution
-float kWeightHit = 0.4;
-float kWeightShort = 0.2;       // probability of dynamic objects is low
-float kWeightMax = 0.2;         // lidar probability of missing objects is low
-float kWeightRand = 0.2;        // sensor is assumed mostly reliable
-float kFreeThreshold = 0.1;     // Probability below which cell is free
-float kOccupiedThreshold = 0.9; // Probability above which cell is occupied
+float kWeightHit = 0.8;
+float kWeightShort = 0.1;        // probability of dynamic objects is low
+float kWeightMax = 0.05;         // lidar probability of missing objects is low
+float kWeightRand = 0.05;        // sensor is assumed mostly reliable
+float kFreeThreshold = 0.01;     // Probability below which cell is free
+float kOccupiedThreshold = 0.99; // Probability above which cell is occupied
+
+double normalizedAngle(float angle) {
+  return angle - (ceil((angle + M_PI) / (2 * M_PI)) - 1) * 2 * M_PI; // (-Pi;Pi]
+}
 
 Particle::Particle(double x, double y, double theta, double weight) {
   x_ = x;
@@ -50,45 +54,18 @@ Particle::Particle(GroundTruthMap &map) {
   theta_ = double(disttheta(gen));
   weight_ = 0;
 }
-void Particle::motionModel(const OdometryParser odom_previous,
-                           const OdometryParser odom_current) {
-  // Input: Two poses in odometry frame
-
-  // Relative Odometry is transformed into a sequence of three steps: a
-  // rotation (delta_rot_1), followed by a straight line motion (delta_trans),
-  // and another rotation (delta_rot_2).
-  // TODO: This operation is same for all particles. Move to ParticleFilter
-  // data structure to calculate only once.
-  float delta_rot_1 = atan2(odom_current.y_ - odom_previous.y_,
-                            odom_current.x_ - odom_previous.x_) -
-                      odom_previous.theta_;
-  if (odom_current.y_ == odom_previous.y_ and
-      odom_current.x_ == odom_previous.x_) {
-    // degenerate case- pure rotation, no translation
-    delta_rot_1 = 0;
-  }
-  float delta_trans = sqrt(pow(odom_current.x_ - odom_previous.x_, 2) +
-                           pow(odom_current.y_ - odom_previous.y_, 2));
-  float delta_rot_2 = odom_current.theta_ - odom_previous.theta_ - delta_rot_1;
-
-  // Calculate posterior distributions
-  float variance_rot1 =
-      kAlpha1 * pow(delta_rot_1, 2) + kAlpha2 * pow(delta_trans, 2);
-  float variance_trans = kAlpha3 * pow(delta_trans, 2) +
-                         kAlpha4 * pow(delta_rot_1, 2) +
-                         kAlpha4 * pow(delta_rot_2, 2);
-  float variance_rot2 =
-      kAlpha1 * pow(delta_rot_2, 2) + kAlpha2 * pow(delta_trans, 2);
-
+void Particle::motionModel(float delta_rot_1, float delta_trans,
+                           float delta_rot_2, float variance_rot1,
+                           float variance_trans, float variance_rot2) {
   // Sample from the posterior probability
   float delta_rot_1_hat = delta_rot_1 - sample(0, variance_rot1);
   float delta_trans_hat = delta_trans - sample(0, variance_trans);
   float delta_rot_2_hat = delta_rot_2 - sample(0, variance_rot2);
 
   // Update particle pose based on obometry
-  x_ += delta_trans_hat * cos(theta_ + delta_rot_1_hat);
-  y_ += delta_trans_hat * sin(theta_ + delta_rot_1_hat);
-  theta_ += delta_rot_1_hat + delta_rot_2_hat;
+  x_ = x_ + delta_trans_hat * cos(theta_ + delta_rot_1_hat);
+  y_ = y_ + delta_trans_hat * sin(theta_ + delta_rot_1_hat);
+  theta_ = normalizedAngle(theta_ + delta_rot_1_hat + delta_rot_2_hat);
 }
 void Particle::observationModel(const GroundTruthMap &map,
                                 const ScanParser obs) {
@@ -114,7 +91,7 @@ void Particle::observationModel(const GroundTruthMap &map,
   double scan_y_gcs = scan_loc_gcs(1);
 
   // Iterate over every fifth ray and find its likelihood
-  double log_likelihood = 0;
+  double likelihood = 0;
   for (int i = 0; i < 180; i += 5) {
     // calculate predicted ray length (z_k_star) using raycasting
     // ray thetas are assumed -90 to 90 deg relative to particle pose
@@ -159,12 +136,12 @@ void Particle::observationModel(const GroundTruthMap &map,
       p_rand = 1 / kMaxRange;
     }
 
-    // calculate the log_likelihood of observed (z_k) ray length
+    // calculate the likelihood of observed (z_k) ray length
     float likelihood_single_ray = kWeightHit * p_hit + kWeightShort * p_short +
                                   kWeightMax * p_max + kWeightRand * p_rand;
-    log_likelihood += log(likelihood_single_ray);
+    likelihood += likelihood_single_ray;
   }
-  weight_ = exp(log_likelihood);
+  weight_ = likelihood;
 };
 
 float Particle::castSingleRay(float x, float y, float theta,
@@ -264,8 +241,8 @@ void Particle::rayPlot(const GroundTruthMap &map, float x, float y, float theta,
 
 float Particle::sample(float mean, float variance) {
   // randomly sample from a Normal distribution
-  std::random_device rd;
-  std::mt19937 gen(rd());
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
   std::normal_distribution<> dist(mean, sqrt(variance));
   return dist(gen);
 }
@@ -290,16 +267,47 @@ ParticleFilter::ParticleFilter(int num, GroundTruthMap &map)
     particle_cloud_.push_back(Particle(map));
   }
 }
-void ParticleFilter::addOdometry(OdometryParser odom_obs) {
+void ParticleFilter::addOdometry(OdometryParser odom_current) {
   if (not odom_initialized) {
-    last_odom_obs_ = odom_obs;
+    odom_previous = odom_current;
     odom_initialized = true;
     return;
   }
   for (int i = 0; i < num_particles_; i++) {
-    particle_cloud_[i].motionModel(last_odom_obs_, odom_obs);
+    // Input: Two poses in odometry frame
+
+    // Relative Odometry is transformed into a sequence of three steps: a
+    // rotation (delta_rot_1), followed by a straight line motion (delta_trans),
+    // and another rotation (delta_rot_2).
+    float delta_rot_1 =
+        normalizedAngle(atan2(odom_current.y_ - odom_previous.y_,
+                              odom_current.x_ - odom_previous.x_) -
+                        odom_previous.theta_);
+    if (odom_current.y_ == odom_previous.y_ and
+        odom_current.x_ == odom_previous.x_) {
+      // degenerate case- pure rotation, no translation
+      delta_rot_1 = 0;
+    }
+    float delta_trans = sqrt(pow(odom_current.x_ - odom_previous.x_, 2) +
+                             pow(odom_current.y_ - odom_previous.y_, 2));
+    float delta_rot_2 = normalizedAngle(odom_current.theta_ -
+                                        odom_previous.theta_ - delta_rot_1);
+
+    // Calculate posterior distributions
+    float variance_rot1 =
+        kAlpha1 * pow(delta_rot_1, 2) + kAlpha2 * pow(delta_trans, 2);
+    float variance_trans = kAlpha3 * pow(delta_trans, 2) +
+                           kAlpha4 * pow(delta_rot_1, 2) +
+                           kAlpha4 * pow(delta_rot_2, 2);
+    float variance_rot2 =
+        kAlpha1 * pow(delta_rot_2, 2) + kAlpha2 * pow(delta_trans, 2);
+
+    // Update each particle
+    particle_cloud_[i].motionModel(delta_rot_1, delta_trans, delta_rot_2,
+                                   variance_rot1, variance_trans,
+                                   variance_rot2);
   }
-  last_odom_obs_ = odom_obs;
+  odom_previous = odom_current;
 }
 void ParticleFilter::addMeasurement(ScanParser lidar_obs) {
   // Calculate importance of each particle
@@ -318,29 +326,27 @@ void ParticleFilter::addMeasurement(ScanParser lidar_obs) {
   for (int i = 0; i < num_particles_; i++) {
     particle_cloud_[i].weight_ = particle_cloud_[i].weight_ / sum_weight;
   }
-
-  // Resample based on importance
-  resample();
 }
-void ParticleFilter::resample() {
+void ParticleFilter::resample(int new_num_particles) {
   std::vector<Particle> new_particle_cloud;
   // low variance resampler
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_real_distribution<> dist(0, 1.0 / num_particles_);
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dist(0, 1.0 / new_num_particles);
   float r = double(dist(gen));
   float c = particle_cloud_[0].weight_;
   int i = 0;
-  for (int m = 0; m < num_particles_; m++) {
-    float u = r + (float)m / num_particles_;
+  for (int m = 0; m < new_num_particles; m++) {
+    float u = r + (float)m / new_num_particles;
     while (u > c) {
       i += 1;
       c += particle_cloud_[i].weight_;
     }
     new_particle_cloud.push_back(particle_cloud_[i]);
-    new_particle_cloud[m].weight_ = 1.0 / num_particles_;
+    new_particle_cloud[m].weight_ = 1.0 / new_num_particles;
   }
   particle_cloud_ = new_particle_cloud;
+  num_particles_ = new_num_particles;
 }
 void ParticleFilter::plot(int ms /*=1*/) {
   // get occupancy grid image

@@ -10,8 +10,9 @@ public:
 public:
   Particle(double x, double y, double theta, double weight);
   Particle(GroundTruthMap &map);
-  void motionModel(const OdometryParser odom_previous,
-                   const OdometryParser odom_current);
+  void motionModel(float delta_rot_1, float delta_trans, float delta_rot_2,
+                   float variance_rot1, float variance_trans,
+                   float variance_rot2);
   void observationModel(const GroundTruthMap &map, const ScanParser obs);
   float castSingleRay(float x, float y, float theta, const GroundTruthMap &map);
   void rayPlot(const GroundTruthMap &map, float x, float y, float theta,
@@ -29,14 +30,14 @@ private:
   int num_particles_;
   std::vector<Particle> particle_cloud_;
   GroundTruthMap map_;
-  OdometryParser last_odom_obs_ = OdometryParser("");
+  OdometryParser odom_previous = OdometryParser("");
   bool odom_initialized = false;
 
 public:
   ParticleFilter(int num_particles, GroundTruthMap &map);
-  void addOdometry(OdometryParser odom_obs);
+  void addOdometry(OdometryParser odom_current);
   void addMeasurement(ScanParser lidar_obs);
-  void resample();
+  void resample(int new_num_particles);
   void plot(int ms = 1);
 };
 
