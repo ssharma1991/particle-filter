@@ -5,8 +5,8 @@
 
 std::string kMapPath = "../ground_truth_map/wean.dat";
 std::string kLogPath = "../logs/robotdata1.log";
-int kInitNumParticles = 10000;
-int kStableNumParticles = 1000;
+int kInitNumParticles = 100000;
+int kStableNumParticles = 1000; // after 100 observations
 
 void replayLog(std::string map_path, std::string log_path) {
   // load map
@@ -28,17 +28,18 @@ void replayLog(std::string map_path, std::string log_path) {
         OdometryParser odom_obs(observation_data);
         particle_filter.addOdometry(odom_obs);
       } else if (observation_type == 'L') {
+        num_lidar_obs++;
+        std::cout << num_lidar_obs << std::flush;
         ScanParser lidar_obs(observation_data);
         // lidar_obs.print();
         particle_filter.addMeasurement(lidar_obs);
         // Resample based on importance
-        if (num_lidar_obs < 10) {
+        if (num_lidar_obs < 100) {
           // Use larger number of particles initially
-          particle_filter.resample(kInitNumParticles);
+          particle_filter.resample(kInitNumParticles / num_lidar_obs);
         } else {
           particle_filter.resample(kStableNumParticles);
         }
-        num_lidar_obs++;
       }
       std::cout << "." << std::flush;
       particle_filter.plot();

@@ -338,7 +338,7 @@ void ParticleFilter::resample(int new_num_particles) {
   int i = 0;
   for (int m = 0; m < new_num_particles; m++) {
     float u = r + (float)m / new_num_particles;
-    while (u > c) {
+    while (u > c && i < new_num_particles) {
       i += 1;
       c += particle_cloud_[i].weight_;
     }
