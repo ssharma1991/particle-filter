@@ -3,8 +3,8 @@
 #include <fstream>
 #include <iostream>
 
-std::string kMapPath = "../ground_truth_map/wean.dat";
-std::string kLogPath = "../logs/robotdata1.log";
+std::string kMapPath = "../data/ground_truth_map/wean.dat";
+std::string kLogPath = "../data/logs/robotdata1.log";
 int kInitNumParticles = 100000;
 int kStableNumParticles = 1000; // after 100 observations
 
