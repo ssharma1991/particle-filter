@@ -4,6 +4,12 @@ project(particle_filter
         LANGUAGES CXX
 )
 
+# Update the submodules here
+include(cmake/UpdateSubmodules.cmake)
+
+# Enable testing for this project
+include(CTest)
+
 # Set build type as debug/release
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)

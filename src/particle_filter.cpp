@@ -1,5 +1,5 @@
 #include "src/particle_filter.h"
-#include "external/eigen-3.4.0/Eigen/Dense"
+#include "external/eigen/Eigen/Dense"
 #include <iostream>
 #include <math.h>
 #include <opencv2/core.hpp>
