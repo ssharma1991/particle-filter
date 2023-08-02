@@ -236,7 +236,7 @@ void Particle::rayPlot(const GroundTruthMap &map, float x, float y, float theta,
   cv::flip(image, image, 0); // image frame y-axis points in -ve direction
   cv::namedWindow("ray", cv::WINDOW_AUTOSIZE);
   cv::imshow("ray", image);
-  cv::waitKey(1000); // wait 1ms for the plot to show
+  cv::waitKey(1000); // wait 1000ms for the plot to show
 }
 
 float Particle::sample(float mean, float variance) {
